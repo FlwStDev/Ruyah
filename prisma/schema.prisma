@@ -1,0 +1,257 @@
+// PostForge data model.
+//
+// Target for local dev is SQLite, but everything here is Postgres-friendly:
+//   - no scalar lists (SQLite cannot store them)
+//   - no native enums (SQLite connector does not support them); status/provider
+//     columns are String and constrained in TypeScript via the unions in
+//     src/lib/constants.ts
+//   - JSON blobs are stored as String so the same schema works on both engines
+// To move to Postgres: change the datasource provider/url, optionally promote
+// the String unions to real enums, and re-run migrate.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  role         String   @default("admin") // see UserRole
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  connectedAccounts ConnectedAccount[]
+  mediaAssets       MediaAsset[]
+  composes          Compose[]
+  posts             Post[]
+  postJobs          PostJob[]
+  oauthStates       OAuthState[]
+  folderDrips       FolderDrip[]
+
+  @@index([email])
+}
+
+model ConnectedAccount {
+  id             String    @id @default(cuid())
+  userId         String
+  provider       String // see SOCIAL_PROVIDERS
+  providerUserId String
+  username       String
+  // AES-256-GCM ciphertext. Never select these into a client component.
+  accessToken    String
+  refreshToken   String?
+  tokenExpiresAt DateTime?
+  scopes         String    @default("")
+  profileJson    String    @default("{}")
+  status         String    @default("active") // see ACCOUNT_STATUSES
+  statusMessage  String?
+  lastCheckedAt  DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  posts Post[]
+
+  @@unique([userId, provider, providerUserId])
+  @@index([userId, provider])
+  @@index([status])
+}
+
+model MediaAsset {
+  id           String   @id @default(cuid())
+  userId       String
+  kind         String // see MEDIA_KINDS: image | video
+  mimeType     String
+  originalName String
+  storageKey   String
+  size         Int
+  width        Int?
+  height       Int?
+  durationMs   Int?
+  checksum     String?
+  // Unguessable id + token used by the unauthenticated public media route that
+  // Instagram/Reddit need in order to fetch bytes over a tunnel.
+  publicId     String   @unique
+  publicToken  String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postMedia PostMedia[]
+
+  @@index([userId, createdAt])
+}
+
+/// Snapshot of one trip through the composer. Kept so a post can be traced back
+/// to what the user actually typed, including per-network overrides.
+model Compose {
+  id           String    @id @default(cuid())
+  userId       String
+  title        String?
+  body         String    @default("")
+  mode         String    @default("now") // see COMPOSE_MODES
+  scheduledFor DateTime?
+  mediaIds     String    @default("[]") // JSON string[]
+  optionsJson  String    @default("{}") // JSON per-network options
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  posts Post[]
+
+  @@index([userId, createdAt])
+}
+
+/// One destination of a compose: the resolved content for a single network.
+model Post {
+  id                 String    @id @default(cuid())
+  userId             String
+  composeId          String?
+  connectedAccountId String?
+  provider           String
+  title              String?
+  body               String    @default("")
+  optionsJson        String    @default("{}")
+  status             String    @default("queued") // mirrors the latest job status
+  scheduledFor       DateTime?
+  publishedAt        DateTime?
+  platformPostId     String?
+  permalink          String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  user    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  compose Compose?          @relation(fields: [composeId], references: [id], onDelete: SetNull)
+  account ConnectedAccount? @relation(fields: [connectedAccountId], references: [id], onDelete: SetNull)
+  media   PostMedia[]
+  jobs    PostJob[]
+
+  @@index([userId, status])
+  @@index([userId, provider])
+  @@index([scheduledFor])
+}
+
+/// Ordered join between a post and its media. A plain String[] would be simpler
+/// but SQLite has no scalar lists and we need stable carousel ordering.
+model PostMedia {
+  id           String   @id @default(cuid())
+  postId       String
+  mediaAssetId String
+  order        Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  post  Post       @relation(fields: [postId], references: [id], onDelete: Cascade)
+  media MediaAsset @relation(fields: [mediaAssetId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, mediaAssetId])
+  @@index([postId, order])
+}
+
+/// The unit of work the worker picks up. One per destination.
+model PostJob {
+  id           String   @id @default(cuid())
+  postId       String
+  userId       String
+  provider     String
+  status       String   @default("queued") // see JOB_STATUSES
+  scheduledFor DateTime
+  attempts     Int      @default(0)
+  maxAttempts  Int      @default(3) // 1 initial + 2 retries
+  nextAttemptAt DateTime?
+
+  /// Stable per-job key. The worker refuses to call a network twice under the
+  /// same key, which is what stops a crash mid-publish from double-posting.
+  idempotencyKey String  @unique
+  lockedAt       DateTime?
+  lockedBy       String?
+  /// Set when a process died between "call sent" and "result stored". Such a
+  /// job is never auto-retried; a human has to confirm on the platform first.
+  needsReview    Boolean @default(false)
+
+  lastError      String?
+  platformPostId String?
+  permalink      String?
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status, scheduledFor])
+  @@index([userId, status])
+  @@index([postId])
+}
+
+/// Short-lived CSRF state (and PKCE verifier) for an in-flight OAuth handshake.
+model OAuthState {
+  id           String    @id @default(cuid())
+  userId       String
+  provider     String
+  state        String    @unique
+  codeVerifier String?
+  redirectTo   String?
+  expiresAt    DateTime
+  consumedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+}
+
+/// Watches a local folder and queues one file per interval through the same
+/// compose/job path as the composer. Posted files are recorded (and usually
+/// moved to `_posted`) so a crash cannot send the same file twice.
+model FolderDrip {
+  id               String    @id @default(cuid())
+  userId           String
+  name             String    @default("Folder drip")
+  folderPath       String
+  intervalMinutes  Int       @default(60)
+  destinationsJson String    @default("[\"x\"]")
+  captionMode      String    @default("filename") // filename | empty | fixed
+  captionText      String    @default("")
+  redditSubreddit  String    @default("")
+  afterPost        String    @default("move") // move | keep
+  enabled          Boolean   @default(true)
+  nextRunAt        DateTime?
+  lastRunAt        DateTime?
+  lastError        String?
+  lastFileName     String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  user  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items FolderDripItem[]
+
+  @@index([enabled, nextRunAt])
+  @@index([userId])
+}
+
+model FolderDripItem {
+  id         String   @id @default(cuid())
+  dripId     String
+  sourcePath String
+  fileName   String
+  status     String   @default("queued") // queued | posted | failed
+  postId     String?
+  lastError  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  drip FolderDrip @relation(fields: [dripId], references: [id], onDelete: Cascade)
+
+  @@unique([dripId, sourcePath])
+  @@index([dripId, status])
+}

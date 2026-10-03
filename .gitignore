@@ -39,3 +39,21 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# PostForge: never commit your media, database or secrets
+/uploads
+/data
+.env
+.env.local
+!.env.example
+*.db
+*.db-journal
+prisma/*.db
+prisma/*.db-journal
+
+# local process logs
+*.log
+dev-out.log
+dev-err.log
+worker-out.log
+worker-err.log
