@@ -1,4 +1,4 @@
-# PostForge
+# Ruyah
 
 Local-first publishing to **X**, **Reddit** and **Instagram**. Write once, pick destinations,
 publish now or schedule, and watch each job land.
@@ -90,7 +90,7 @@ You need one app per network. All three are free.
    while you Connect.
 3. Copy the **OAuth 2.0 Client ID** and **Client Secret** into `X_CLIENT_ID` / `X_CLIENT_SECRET`.
 
-PostForge uses OAuth 2.0 Authorization Code **with PKCE** and asks for
+Ruyah uses OAuth 2.0 Authorization Code **with PKCE** and asks for
 `tweet.read tweet.write users.read offline.access media.write`. `offline.access` is what gets you a
 refresh token; without it the connection dies after a couple of hours.
 
@@ -106,10 +106,10 @@ refresh token; without it the connection dies after a couple of hours.
 5. Set `REDDIT_USER_AGENT` to include your real username:
    `web:postforge:0.1.0 (by /u/yourname)`
 
-Scopes: `identity submit read mysubreddits flair`. PostForge requests `duration=permanent`, which is
+Scopes: `identity submit read mysubreddits flair`. Ruyah requests `duration=permanent`, which is
 what makes Reddit issue a refresh token.
 
-**r/test** is a good first target. Reddit refuses generic user agents, so PostForge will not even
+**r/test** is a good first target. Reddit refuses generic user agents, so Ruyah will not even
 try to call the API while `REDDIT_USER_AGENT` still says `/u/replace`.
 
 ### Instagram
@@ -128,7 +128,7 @@ Instagram is the fiddliest of the three.
    accept the invite in the Instagram app under *Settings -> Apps and websites -> Tester invites*.
 
 **Your Instagram account must be a professional account** (Business or Creator). A personal account
-cannot publish through the API; PostForge detects this at connection time and says so instead of
+cannot publish through the API; Ruyah detects this at connection time and says so instead of
 failing later with a cryptic Graph error. Switch in the Instagram app:
 *Settings -> Account type and tools -> Switch to professional account*.
 
@@ -154,7 +154,7 @@ Put the HTTPS origin it prints into `.env` and restart the dev server:
 PUBLIC_BASE_URL=https://your-subdomain.ngrok.app
 ```
 
-PostForge then serves each file from `/api/public/media/<publicId>?t=<token>`, the one route in the
+Ruyah then serves each file from `/api/public/media/<publicId>?t=<token>`, the one route in the
 app without authentication. It is guarded by an unguessable 128-bit id plus a 192-bit token compared
 in constant time, and it only ever serves rows from the media table.
 
@@ -170,19 +170,19 @@ from localhost.
 ## Rate limits and quotas
 
 This tool posts as you. Burning your quota or tripping spam detection is your account's problem, so
-PostForge is deliberately unhurried:
+Ruyah is deliberately unhurried:
 
 - The worker polls every 5s (`WORKER_POLL_INTERVAL_MS`) and runs 2 jobs at a time
   (`WORKER_CONCURRENCY`).
 - **Retries only happen on 429 and 5xx**, twice, backing off 30s then 2min. A 4xx is a logic error;
   retrying it just repeats the same rejection.
 - **X:** posting caps are tied to your API tier and are small. Watch for 429 and the
-  `x-rate-limit-reset` header, which PostForge includes in the error message.
+  `x-rate-limit-reset` header, which Ruyah includes in the error message.
 - **Reddit:** 100 queries per minute per OAuth client, and a much stricter unwritten limit on
   *submissions*. New or low-karma accounts get rate-limited after a handful of posts. Reddit also
   requires the descriptive `User-Agent` - a generic one gets you throttled or blocked.
 - **Instagram:** 50 published posts per 24 hours per account, and container creation is itself rate
-  limited. Container processing takes anywhere from seconds to a minute for Reels; PostForge polls
+  limited. Container processing takes anywhere from seconds to a minute for Reels; Ruyah polls
   for up to 2 minutes before giving up.
 
 Do not point this at a scheduler that fires dozens of posts at once.
@@ -191,7 +191,7 @@ Do not point this at a scheduler that fires dozens of posts at once.
 
 ## Consent and conduct
 
-PostForge publishes **as the connected user**, using a token that user explicitly granted through
+Ruyah publishes **as the connected user**, using a token that user explicitly granted through
 the network's own OAuth consent screen. It does not scrape, does not log in with
 session cookies, and does not use unofficial endpoints. Disconnecting an account deletes its tokens
 from the database immediately; you can also revoke access from the network's own app settings.
@@ -243,7 +243,7 @@ not-implemented entries.
 ### Not double-posting
 
 The dangerous case is a process dying between "request sent" and "result stored" - the post exists
-but PostForge does not know it. Three layers handle this:
+but Ruyah does not know it. Three layers handle this:
 
 1. Claiming a job is a conditional update (`where status = 'queued'`), so two workers cannot take
    the same job.
@@ -278,7 +278,7 @@ is the default), pick destinations, and start it.
 - **SQLite** via Prisma. The schema avoids enums and scalar lists, so switching
   `datasource.provider` to `postgresql` and re-running migrate is all it takes to move.
 - **Video on Reddit** needs a poster image. Generating one from the mp4 would require a system
-  ffmpeg, which this app deliberately does not depend on, so PostForge uploads a plain dark
+  ffmpeg, which this app deliberately does not depend on, so Ruyah uploads a plain dark
   placeholder. If you want a real frame, install ffmpeg and extract it yourself.
 - **Video duration/dimensions** are not probed for the same reason; images are measured with sharp.
 - **Media limits:** 4 images *or* 1 video per post, 100 MB per file.

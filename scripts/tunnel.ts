@@ -31,7 +31,7 @@ function publish(url: string) {
   console.log(`  Website URL:  ${base}`);
   console.log(`  Callback URI: ${redirect}`);
   console.log("");
-  console.log("Then in PostForge: Save X (redirect is already updated) → Connect X.");
+  console.log("Then in Ruyah: Save X (redirect is already updated) → Connect X.");
   console.log("Leave this window open while you connect.");
 }
 

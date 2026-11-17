@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { PROVIDER_LABELS, type SocialProvider } from "@/lib/constants";
+import { PageBanner } from "@/components/page-banner";
 import type { PublicAccount } from "@/lib/accounts";
 import { apiDelete, apiPost, errorText } from "@/lib/client/api";
 
@@ -23,6 +24,17 @@ export type ProviderCard = {
   redirectUri: string;
   scopes: string[];
   accounts: PublicAccount[];
+};
+
+const DEVELOPER_PAGES: Record<string, { href: string; label: string }> = {
+  x: { href: "https://console.x.com", label: "Open the X developer console" },
+  reddit: { href: "https://www.reddit.com/prefs/apps", label: "Open Reddit apps" },
+  instagram: { href: "https://developers.facebook.com/apps", label: "Open the Meta developer apps" },
+  linkedin: { href: "https://www.linkedin.com/developers/apps", label: "Open LinkedIn apps" },
+  tiktok: { href: "https://developers.tiktok.com/", label: "Open TikTok for developers" },
+  youtube: { href: "https://console.cloud.google.com/apis/library/youtube.googleapis.com", label: "Open YouTube Data API" },
+  facebook: { href: "https://developers.facebook.com/apps", label: "Open the Meta developer apps" },
+  threads: { href: "https://developers.facebook.com/docs/threads", label: "Open the Threads API docs" },
 };
 
 type Props = {
@@ -195,15 +207,12 @@ export function ConnectionsClient({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Connections</h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Paste the Client ID and Secret from each developer console, save, then connect. Secrets
-          are written to <code className="text-xs">.env</code> and never shown again.
-        </p>
-      </div>
+      <PageBanner
+        title="Networks"
+        lede="Each network needs an app of your own. Open the developer page, copy the id and secret, save them here, then connect."
+      />
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-6">
         {cards.map((card) => {
           const draft = drafts[card.provider];
           const ready = draft.configured;
@@ -224,6 +233,16 @@ export function ConnectionsClient({
                   ) : null}
                 </div>
                 <CardDescription className="text-xs">{card.description}</CardDescription>
+                {DEVELOPER_PAGES[card.provider] ? (
+                  <a
+                    href={DEVELOPER_PAGES[card.provider].href}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="text-primary mt-2 inline-block text-xs underline underline-offset-4"
+                  >
+                    {DEVELOPER_PAGES[card.provider].label}
+                  </a>
+                ) : null}
               </CardHeader>
 
               <CardContent className="flex flex-1 flex-col gap-3">
@@ -405,18 +424,30 @@ export function ConnectionsClient({
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Not in this MVP</CardTitle>
+          <CardTitle className="text-xs font-semibold tracking-[0.16em] uppercase">Still on the desk</CardTitle>
           <CardDescription className="text-xs">
-            Adapter stubs only. Each is a copy of an existing adapter away.
+            These networks are part of Ruyah. They are not wired to publish yet.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           {stubs.map((stub, index) => (
             <div key={stub.id}>
               {index > 0 && <Separator />}
-              <div className="flex items-baseline gap-3 px-6 py-2.5">
-                <span className="w-24 shrink-0 text-sm">{stub.label}</span>
-                <span className="text-muted-foreground text-xs">{stub.note}</span>
+              <div className="flex flex-wrap items-baseline justify-between gap-3 px-6 py-3">
+                <div className="flex items-baseline gap-3">
+                  <span className="w-24 shrink-0 text-sm">{stub.label}</span>
+                  <span className="text-muted-foreground text-xs">{stub.note}</span>
+                </div>
+                {DEVELOPER_PAGES[stub.id] ? (
+                  <a
+                    href={DEVELOPER_PAGES[stub.id].href}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="text-primary text-xs underline underline-offset-4"
+                  >
+                    {DEVELOPER_PAGES[stub.id].label}
+                  </a>
+                ) : null}
               </div>
             </div>
           ))}

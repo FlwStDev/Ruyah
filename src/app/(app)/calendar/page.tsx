@@ -1,4 +1,4 @@
-import { addDays, startOfWeek } from "date-fns";
+import { addMonths, endOfMonth, endOfWeek, startOfMonth, startOfWeek } from "date-fns";
 import { prisma } from "@/lib/db";
 import { requireUserPage } from "@/lib/auth/guard";
 import { serializePost } from "@/lib/serializers";
@@ -6,22 +6,21 @@ import { CalendarClient } from "@/components/calendar-client";
 
 export const dynamic = "force-dynamic";
 
-type Props = { searchParams: Promise<{ week?: string }> };
+type Props = { searchParams: Promise<{ month?: string }> };
 
 export default async function CalendarPage({ searchParams }: Props) {
   const user = await requireUserPage();
   const params = await searchParams;
-
-  // ?week is an offset from the current week, so navigation stays stateless.
-  const offset = Number.parseInt(params.week ?? "0", 10);
-  const weekOffset = Number.isFinite(offset) ? offset : 0;
-  const weekStart = addDays(startOfWeek(new Date(), { weekStartsOn: 1 }), weekOffset * 7);
-  const weekEnd = addDays(weekStart, 7);
+  const offset = Number.parseInt(params.month ?? "0", 10);
+  const monthOffset = Number.isFinite(offset) ? offset : 0;
+  const monthStart = addMonths(startOfMonth(new Date()), monthOffset);
+  const gridStart = startOfWeek(monthStart, { weekStartsOn: 0 });
+  const gridEnd = endOfWeek(endOfMonth(monthStart), { weekStartsOn: 0 });
 
   const posts = await prisma.post.findMany({
     where: {
       userId: user.id,
-      scheduledFor: { gte: weekStart, lt: weekEnd },
+      scheduledFor: { gte: gridStart, lt: gridEnd },
     },
     orderBy: { scheduledFor: "asc" },
     include: {
@@ -33,8 +32,8 @@ export default async function CalendarPage({ searchParams }: Props) {
 
   return (
     <CalendarClient
-      weekStartIso={weekStart.toISOString()}
-      weekOffset={weekOffset}
+      monthStartIso={monthStart.toISOString()}
+      monthOffset={monthOffset}
       posts={posts.map(serializePost)}
     />
   );

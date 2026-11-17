@@ -21,7 +21,7 @@ export default async function RegisterPage() {
         <CardHeader>
           <CardTitle>Registration is closed</CardTitle>
           <CardDescription>
-            This PostForge install already has an account. Set ALLOW_REGISTER=true in .env and
+            This Ruyah install already has an account. Set ALLOW_REGISTER=true in .env and
             restart if you need another.
           </CardDescription>
         </CardHeader>

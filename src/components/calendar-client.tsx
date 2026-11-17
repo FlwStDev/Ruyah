@@ -1,164 +1,170 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { addDays, format, isSameDay } from "date-fns";
-import { Ban, ChevronLeft, ChevronRight, ExternalLink, Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import {
+  addDays,
+  format,
+  isSameDay,
+  isSameMonth,
+  startOfWeek,
+} from "date-fns";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { PageBanner } from "@/components/page-banner";
 import { StatusBadge } from "@/components/status-badge";
-import { apiPost, errorText } from "@/lib/client/api";
 import { PROVIDER_LABELS } from "@/lib/constants";
 import type { SerializedPost } from "@/lib/serializers";
 
 type Props = {
-  weekStartIso: string;
-  weekOffset: number;
+  monthStartIso: string;
+  monthOffset: number;
   posts: SerializedPost[];
 };
 
-export function CalendarClient({ weekStartIso, weekOffset, posts }: Props) {
+const NOTES_KEY = "ruyah-day-notes";
+
+function dayKey(date: Date) {
+  return format(date, "yyyy-MM-dd");
+}
+
+export function CalendarClient({ monthStartIso, monthOffset, posts }: Props) {
   const router = useRouter();
-  const [busyJobId, setBusyJobId] = useState<string | null>(null);
-
-  const weekStart = new Date(weekStartIso);
-  const days = Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
+  const monthStart = new Date(monthStartIso);
+  const gridStart = startOfWeek(monthStart, { weekStartsOn: 0 });
+  const days = Array.from({ length: 42 }, (_, index) => addDays(gridStart, index));
   const today = new Date();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [noteDay, setNoteDay] = useState(dayKey(today));
 
-  async function cancel(jobId: string) {
-    setBusyJobId(jobId);
+  useEffect(() => {
     try {
-      await apiPost(`/api/jobs/${jobId}/cancel`);
-      toast.success("Job canceled.");
-      router.refresh();
-    } catch (error) {
-      toast.error(errorText(error));
-    } finally {
-      setBusyJobId(null);
+      const raw = localStorage.getItem(NOTES_KEY);
+      if (raw) setNotes(JSON.parse(raw) as Record<string, string>);
+    } catch {
+      setNotes({});
     }
+  }, []);
+
+  function saveNote(value: string) {
+    const next = { ...notes, [noteDay]: value };
+    setNotes(next);
+    localStorage.setItem(NOTES_KEY, JSON.stringify(next));
   }
 
   function goto(offset: number) {
-    router.push(offset === 0 ? "/calendar" : `/calendar?week=${offset}`);
+    router.push(offset === 0 ? "/calendar" : `/calendar?month=${offset}`);
   }
 
+  const selected = posts.find((post) => post.id === selectedId) ?? null;
+
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Calendar</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            {format(weekStart, "d MMM")} - {format(addDays(weekStart, 6), "d MMM yyyy")}
-          </p>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <Button
-            variant="outline"
-            size="sm"
-            aria-label="Previous week"
-            onClick={() => goto(weekOffset - 1)}
-          >
-            <ChevronLeft className="size-3.5" />
+    <div className="space-y-6">
+      <PageBanner title="Calendar" lede="A month at a time. Open a post for its details, and keep a note on the day." />
+
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-lg font-medium tracking-tight">{format(monthStart, "MMMM yyyy")}</p>
+        <div className="flex items-center gap-1">
+          <Button type="button" variant="outline" size="icon" aria-label="Previous month" onClick={() => goto(monthOffset - 1)}>
+            <ChevronLeft className="size-4" />
           </Button>
-          <Button variant="outline" size="sm" onClick={() => goto(0)} disabled={weekOffset === 0}>
-            This week
+          <Button type="button" variant="outline" onClick={() => goto(0)} disabled={monthOffset === 0}>
+            This month
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            aria-label="Next week"
-            onClick={() => goto(weekOffset + 1)}
-          >
-            <ChevronRight className="size-3.5" />
+          <Button type="button" variant="outline" size="icon" aria-label="Next month" onClick={() => goto(monthOffset + 1)}>
+            <ChevronRight className="size-4" />
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-7">
-        {days.map((day) => {
-          const dayPosts = posts.filter(
-            (post) => post.scheduledFor && isSameDay(new Date(post.scheduledFor), day),
-          );
-          const isToday = isSameDay(day, today);
-
-          return (
-            <div
-              key={day.toISOString()}
-              className={cn(
-                "border-border/60 bg-card/40 min-h-44 rounded-lg border p-2",
-                isToday && "border-primary/50 bg-primary/5",
-              )}
-            >
-              <div className="mb-2 flex items-baseline justify-between">
-                <span className="text-xs font-medium">{format(day, "EEE")}</span>
-                <span className={cn("text-xs", isToday ? "text-primary" : "text-muted-foreground")}>
-                  {format(day, "d")}
-                </span>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="border">
+          <div className="text-muted-foreground grid grid-cols-7 border-b text-[11px] tracking-[0.14em] uppercase">
+            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((label) => (
+              <div key={label} className="px-2 py-2">
+                {label}
               </div>
-
-              <div className="space-y-1.5">
-                {dayPosts.length === 0 ? (
-                  <p className="text-muted-foreground/60 text-[10px]">-</p>
-                ) : (
-                  dayPosts.map((post) => {
-                    const job = post.jobs[0];
-                    return (
-                      <div
+            ))}
+          </div>
+          <div className="grid grid-cols-7">
+            {days.map((day) => {
+              const inMonth = isSameMonth(day, monthStart);
+              const key = dayKey(day);
+              const dayPosts = posts.filter(
+                (post) => post.scheduledFor && isSameDay(new Date(post.scheduledFor), day),
+              );
+              return (
+                <div
+                  key={key}
+                  className={cn(
+                    "min-h-24 border-r border-b p-1.5",
+                    !inMonth && "bg-muted/30 text-muted-foreground",
+                    isSameDay(day, today) && "outline outline-1 outline-primary",
+                  )}
+                >
+                  <button
+                    type="button"
+                    className="text-xs font-medium"
+                    onClick={() => setNoteDay(key)}
+                  >
+                    {format(day, "d")}
+                  </button>
+                  <div className="mt-1 space-y-1">
+                    {dayPosts.map((post) => (
+                      <button
                         key={post.id}
-                        className="border-border/60 bg-background/60 space-y-1 rounded-md border p-1.5"
+                        type="button"
+                        onClick={() => setSelectedId(post.id)}
+                        className="bg-primary/15 hover:bg-primary/25 block w-full truncate px-1 py-0.5 text-left text-[10px]"
                       >
-                        <div className="flex items-center justify-between gap-1">
-                          <span className="text-[10px] font-medium">
-                            {post.scheduledFor
-                              ? format(new Date(post.scheduledFor), "HH:mm")
-                              : ""}
-                          </span>
-                          <StatusBadge status={post.status} className="px-1 py-0 text-[9px]" />
-                        </div>
-                        <p className="text-muted-foreground truncate text-[10px]">
-                          {PROVIDER_LABELS[post.provider]}
-                        </p>
-                        <p className="line-clamp-2 text-[10px] leading-snug">
-                          {post.title || post.body || "(media only)"}
-                        </p>
+                        {format(new Date(post.scheduledFor!), "HH:mm")} {PROVIDER_LABELS[post.provider]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
 
-                        <div className="flex gap-1">
-                          {post.permalink ? (
-                            <a
-                              href={post.permalink}
-                              target="_blank"
-                              rel="noreferrer noopener"
-                              className="text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5 text-[10px]"
-                            >
-                              <ExternalLink className="size-2.5" />
-                              View
-                            </a>
-                          ) : null}
-                          {job && post.status === "queued" ? (
-                            <button
-                              type="button"
-                              disabled={busyJobId === job.id}
-                              onClick={() => cancel(job.id)}
-                              className="text-muted-foreground hover:text-destructive inline-flex items-center gap-0.5 text-[10px]"
-                            >
-                              {busyJobId === job.id ? (
-                                <Loader2 className="size-2.5 animate-spin" />
-                              ) : (
-                                <Ban className="size-2.5" />
-                              )}
-                              Cancel
-                            </button>
-                          ) : null}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
+        <aside className="space-y-4">
+          <div className="border p-4">
+            <p className="text-[11px] tracking-[0.14em] uppercase">Notes · {noteDay}</p>
+            <textarea
+              value={notes[noteDay] ?? ""}
+              onChange={(event) => saveNote(event.target.value)}
+              rows={6}
+              placeholder="A reminder for this day."
+              className="bg-background mt-3 w-full resize-y border px-3 py-2 text-sm"
+            />
+          </div>
+
+          {selected ? (
+            <div className="border p-4">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-[11px] tracking-[0.14em] uppercase">Post</p>
+                <button type="button" aria-label="Close details" onClick={() => setSelectedId(null)}>
+                  <X className="size-4" />
+                </button>
               </div>
+              <p className="mt-3 text-sm font-medium">{PROVIDER_LABELS[selected.provider]}</p>
+              <p className="text-muted-foreground mt-1 text-xs">
+                {selected.scheduledFor ? new Date(selected.scheduledFor).toLocaleString() : "Unscheduled"}
+              </p>
+              <div className="mt-2">
+                <StatusBadge status={selected.status} />
+              </div>
+              <p className="mt-3 text-sm whitespace-pre-wrap">{selected.body || "No caption."}</p>
+              {selected.accountUsername ? (
+                <p className="text-muted-foreground mt-2 text-xs">@{selected.accountUsername}</p>
+              ) : null}
             </div>
-          );
-        })}
+          ) : (
+            <p className="text-muted-foreground text-sm">Select a scheduled post to open its details.</p>
+          )}
+        </aside>
       </div>
     </div>
   );

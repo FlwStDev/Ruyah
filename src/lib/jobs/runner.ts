@@ -212,7 +212,7 @@ export async function recoverStaleJobs(): Promise<number> {
         lockedBy: null,
         finishedAt: new Date(),
         lastError:
-          "The worker stopped while this was publishing, so PostForge cannot tell whether it went out. Check your profile on the network before retrying - retrying may double-post.",
+          "The worker stopped while this was publishing, so Ruyah cannot tell whether it went out. Check your profile on the network before retrying - retrying may double-post.",
       },
     });
     await syncPostStatus(job.id, "failed");

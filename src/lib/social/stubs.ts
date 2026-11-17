@@ -18,6 +18,11 @@ export type StubAdapterInfo = {
 };
 
 export const STUB_ADAPTERS: Record<StubProvider, StubAdapterInfo> = {
+  linkedin: {
+    id: "linkedin",
+    label: "LinkedIn",
+    note: "Member posts need the w_member_social scope and a LinkedIn app.",
+  },
   tiktok: {
     id: "tiktok",
     label: "TikTok",
@@ -43,7 +48,7 @@ export const STUB_ADAPTERS: Record<StubProvider, StubAdapterInfo> = {
 export function notImplemented(provider: StubProvider): never {
   const info = STUB_ADAPTERS[provider];
   throw new AppError(
-    `${info.label} is not part of this MVP. ${info.note}`,
+    `${info.label} is on the desk, not wired up yet. ${info.note}`,
     { status: 501, code: "not_implemented" },
   );
 }

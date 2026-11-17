@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { StatusBadge } from "@/components/status-badge";
+import { PageBanner } from "@/components/page-banner";
 import { MediaThumb } from "@/components/media-library";
 import { apiPost, errorText } from "@/lib/client/api";
 import {
@@ -66,14 +67,15 @@ export function PostsClient({ posts, activeProvider, activeStatus }: Props) {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Posts</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            One row per destination.{" "}
-            {hasInFlight ? "Refreshing while jobs are in flight." : ""}
-          </p>
-        </div>
+      <PageBanner
+        title="Posts"
+        lede={
+          hasInFlight
+            ? "One row for each network. Refreshing while jobs are in flight."
+            : "One row for each network."
+        }
+      />
+      <div className="flex justify-end">
         <Button variant="outline" size="sm" onClick={() => router.refresh()}>
           <RefreshCw className="size-3.5" />
           Refresh
@@ -238,35 +240,20 @@ function FilterRow({
   onChange: (value: string | null) => void;
 }) {
   return (
-    <div className="flex items-center gap-1.5">
-      <span className="text-muted-foreground mr-1 text-xs">{label}</span>
-      <button
-        type="button"
-        onClick={() => onChange(null)}
-        className={cn(
-          "rounded-full border px-2.5 py-0.5 text-[11px] transition-colors",
-          active === null
-            ? "border-primary bg-primary/10 text-foreground"
-            : "border-border text-muted-foreground hover:text-foreground",
-        )}
+    <label className="text-muted-foreground grid gap-1 text-[11px] tracking-[0.14em] uppercase">
+      {label}
+      <select
+        className="bg-background text-foreground h-10 min-w-48 border px-3 text-sm tracking-normal normal-case"
+        value={active ?? ""}
+        onChange={(event) => onChange(event.target.value || null)}
       >
-        All
-      </button>
-      {options.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          onClick={() => onChange(option.value)}
-          className={cn(
-            "rounded-full border px-2.5 py-0.5 text-[11px] transition-colors",
-            active === option.value
-              ? "border-primary bg-primary/10 text-foreground"
-              : "border-border text-muted-foreground hover:text-foreground",
-          )}
-        >
-          {option.label}
-        </button>
-      ))}
-    </div>
+        <option value="">All</option>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }

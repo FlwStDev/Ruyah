@@ -7,7 +7,7 @@ import { claimDueJobs, recoverStaleJobs, runJob } from "./src/lib/jobs/runner";
 import { processDueFolderDrips } from "./src/lib/folder-drip";
 
 /**
- * PostForge worker.
+ * Ruyah worker.
  *
  * Polls for due jobs, runs them through p-queue with bounded concurrency, and
  * exits cleanly on Ctrl+C so in-flight publishes are not abandoned mid-call.
@@ -69,7 +69,7 @@ async function tick(): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  log(`PostForge worker ${WORKER_ID} starting`);
+  log(`Ruyah worker ${WORKER_ID} starting`);
   log(`poll every ${POLL_INTERVAL_MS}ms, concurrency ${CONCURRENCY}`);
 
   if (!env.tokenEncryptionKey) {

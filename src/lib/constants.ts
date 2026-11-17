@@ -7,7 +7,7 @@ export const SOCIAL_PROVIDERS = ["x", "reddit", "instagram"] as const;
 export type SocialProvider = (typeof SOCIAL_PROVIDERS)[number];
 
 /** Networks with adapter stubs only - intentionally out of scope for the MVP. */
-export const STUB_PROVIDERS = ["tiktok", "youtube", "facebook", "threads"] as const;
+export const STUB_PROVIDERS = ["linkedin", "tiktok", "youtube", "facebook", "threads"] as const;
 export type StubProvider = (typeof STUB_PROVIDERS)[number];
 
 export const PROVIDER_LABELS: Record<SocialProvider, string> = {

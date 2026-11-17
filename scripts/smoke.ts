@@ -64,7 +64,7 @@ const ADAPTER_METHODS = [
 ] as const;
 
 async function main() {
-  console.log("PostForge smoke test\n");
+  console.log("Ruyah smoke test\n");
 
   for (const route of ROUTES) expectFile(`route ${route.replace("src/app", "")}`, route);
   for (const page of PAGES) expectFile(`page  ${page.replace("src/app", "")}`, page);

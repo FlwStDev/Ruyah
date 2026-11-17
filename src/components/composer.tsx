@@ -2,13 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { CalendarClock, CircleAlert, Loader2, Send, X as XIcon } from "lucide-react";
+import { CalendarClock, ChevronDown, ChevronUp, CircleAlert, Loader2, Send, X as XIcon } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -27,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { MediaThumb, MediaUploader } from "@/components/media-library";
+import { PageBanner } from "@/components/page-banner";
 import { apiPost, errorText } from "@/lib/client/api";
 import {
   INSTAGRAM_CAPTION_LIMIT,
@@ -37,6 +36,22 @@ import {
   type SocialProvider,
 } from "@/lib/constants";
 import type { SerializedMedia } from "@/lib/serializers";
+
+const CAPTION_STARTERS = [
+  "A quiet frame from today.",
+  "Keeping this one.",
+  "Same light, new picture.",
+];
+
+const SUGGESTED_TAGS = ["#photo", "#daily", "#studio", "#archive", "#now", "#behindthescenes"];
+
+type BufferItem = {
+  id: string;
+  caption: string;
+  when: string;
+  immediate: boolean;
+  destinations: string[];
+};
 
 type ProviderState = {
   provider: SocialProvider;
@@ -75,6 +90,7 @@ export function Composer({ providers, initialMedia, publicBaseUrlSet }: Props) {
   const [mode, setMode] = useState<"now" | "schedule">("now");
   const [scheduledAt, setScheduledAt] = useState(defaultScheduleValue);
   const [busy, setBusy] = useState(false);
+  const [buffer, setBuffer] = useState<BufferItem[]>([]);
 
   const [subreddit, setSubreddit] = useState("");
   const [flairText, setFlairText] = useState("");
@@ -233,32 +249,63 @@ export function Composer({ providers, initialMedia, publicBaseUrlSet }: Props) {
         payload,
       );
 
+      setBuffer((current) => [
+        {
+          id: crypto.randomUUID(),
+          caption: body.trim().slice(0, 90) || "Untitled",
+          when: mode === "now" ? "Sending shortly" : new Date(scheduledAt).toLocaleString(),
+          immediate: mode === "now",
+          destinations: destinations.map((provider) => PROVIDER_LABELS[provider]),
+        },
+        ...current,
+      ]);
+      setBusy(false);
       toast.success(
         mode === "now"
-          ? `Queued ${result.jobs.length} post${result.jobs.length === 1 ? "" : "s"}. The worker picks them up within a few seconds.`
-          : `Scheduled ${result.jobs.length} post${result.jobs.length === 1 ? "" : "s"} for ${new Date(scheduledAt).toLocaleString()}.`,
+          ? `Held ${result.jobs.length} post${result.jobs.length === 1 ? "" : "s"} in the queue. The worker sends them in a few seconds.`
+          : `Held ${result.jobs.length} post${result.jobs.length === 1 ? "" : "s"} for ${new Date(scheduledAt).toLocaleString()}.`,
       );
-      // push alone: /posts is force-dynamic, so it re-fetches on navigation.
-      // Adding router.refresh() here would race the push and strand the user.
-      router.push("/posts");
+      glide("queue-stage");
     } catch (error) {
       toast.error(errorText(error), { duration: 8000 });
       setBusy(false);
     }
   }
 
-  return (
-    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-      <div className="space-y-5">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Compose</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            One draft, one job per destination.
-          </p>
-        </div>
+  function glide(id: string) {
+    const node = document.getElementById(id);
+    if (!node) return;
+    node.classList.remove("glide-in");
+    void node.offsetWidth;
+    node.classList.add("glide-in");
+    node.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
-        <Card>
-          <CardContent className="space-y-4 pt-6">
+  function moveSelected(id: string, direction: -1 | 1) {
+    setSelectedMediaIds((current) => {
+      const index = current.indexOf(id);
+      const next = index + direction;
+      if (index < 0 || next < 0 || next >= current.length) return current;
+      const copy = [...current];
+      const [item] = copy.splice(index, 1);
+      copy.splice(next, 0, item);
+      return copy;
+    });
+  }
+
+  function addToCaption(text: string) {
+    setBody((current) => (current.includes(text) ? current : `${current.trim()} ${text}`.trim()));
+  }
+
+  return (
+    <div className="mx-auto max-w-5xl space-y-12">
+      <PageBanner
+        title="Content Creation"
+        lede="Words first, then the picture. Networks and the clock come after you glide down."
+      />
+      <div className="space-y-8">
+
+        <div className="space-y-4">
             {redditSelected ? (
               <div className="space-y-2">
                 <div className="flex items-baseline justify-between">
@@ -284,16 +331,48 @@ export function Composer({ providers, initialMedia, publicBaseUrlSet }: Props) {
               </div>
             ) : null}
 
-            <div className="space-y-2">
-              <Label htmlFor="body">Caption</Label>
+            <div className="bg-muted/40 space-y-4 rounded-3xl border p-5 md:p-8">
+              <Label htmlFor="body" className="text-muted-foreground text-xs tracking-wide uppercase">
+                Caption
+              </Label>
               <Textarea
                 id="body"
-                rows={7}
-                placeholder="What are you posting?"
+                rows={8}
+                placeholder="Start with one sentence. Add a tag when it helps."
                 value={body}
                 onChange={(event) => setBody(event.target.value)}
-                className="resize-y"
+                className="bg-background min-h-56 w-full resize-y rounded-2xl border px-4 py-4 text-lg"
               />
+              <div className="space-y-2">
+                <p className="text-muted-foreground text-[11px] tracking-[0.14em] uppercase">Suggestions</p>
+                <div className="flex flex-wrap gap-2">
+                  {CAPTION_STARTERS.map((line) => (
+                    <button
+                      key={line}
+                      type="button"
+                      onClick={() => addToCaption(line)}
+                      className="hover:border-primary rounded-full border px-3 py-1.5 text-left text-xs"
+                    >
+                      {line}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-muted-foreground pt-2 text-[11px] tracking-[0.14em] uppercase">
+                  Suggested tags
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {SUGGESTED_TAGS.map((tag) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => addToCaption(tag)}
+                      className="bg-background hover:border-primary rounded-full border px-3 py-1.5 text-xs"
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 text-[11px]">
                 {destinations.map((provider) => {
                   const text = bodyFor(provider);
@@ -351,12 +430,11 @@ export function Composer({ providers, initialMedia, publicBaseUrlSet }: Props) {
                 </AccordionItem>
               </Accordion>
             ) : null}
-          </CardContent>
-        </Card>
+        </div>
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Media</CardTitle>
+            <CardTitle className="text-xs font-semibold tracking-[0.16em] uppercase">Media</CardTitle>
             <CardDescription className="text-xs">
               Up to {MAX_IMAGES_PER_POST} images or 1 video.
               {imageCount > 0 ? ` ${imageCount} image${imageCount === 1 ? "" : "s"} selected.` : ""}
@@ -399,7 +477,7 @@ export function Composer({ providers, initialMedia, publicBaseUrlSet }: Props) {
                           : `Select ${asset.originalName}`
                       }
                     >
-                      <MediaThumb media={asset} className="aspect-square w-full" />
+                      <MediaThumb media={asset} fit="contain" className="aspect-4/3 w-full bg-muted" />
                       {index >= 0 ? (
                         <span className="bg-primary text-primary-foreground absolute top-1 left-1 flex size-4 items-center justify-center rounded-full text-[10px] font-semibold">
                           {index + 1}
@@ -412,61 +490,63 @@ export function Composer({ providers, initialMedia, publicBaseUrlSet }: Props) {
             )}
           </CardContent>
         </Card>
+        <div className="flex justify-end">
+          <Button type="button" className="h-12 px-8" onClick={() => glide("send-stage")}>
+            Continue to networks
+          </Button>
+        </div>
       </div>
 
-      <div className="space-y-5">
+      <div id="send-stage" className="glide-in space-y-5">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Destinations</CardTitle>
+            <CardTitle className="text-xs font-semibold tracking-[0.16em] uppercase">Send to</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="grid gap-2">
             {providers.map((entry) => {
               const disabled = !entry.connected;
               const checked = destinations.includes(entry.provider);
               return (
-                <div key={entry.provider} className="flex items-start gap-3">
-                  <Checkbox
-                    id={`dest-${entry.provider}`}
-                    checked={checked}
-                    disabled={disabled}
-                    onCheckedChange={() => toggleDestination(entry.provider)}
-                    className="mt-0.5"
+                <button
+                  key={entry.provider}
+                  type="button"
+                  aria-pressed={checked}
+                  onClick={() => {
+                    if (!entry.configured) {
+                      router.push("/settings/setup");
+                      return;
+                    }
+                    if (!entry.connected || entry.needsReauth) {
+                      router.push("/settings/connections");
+                      return;
+                    }
+                    toggleDestination(entry.provider);
+                  }}
+                  className={cn(
+                    "flex min-h-14 items-center justify-between border px-3 text-left transition-colors",
+                    checked ? "border-primary" : "border-border hover:border-foreground",
+                    disabled && "opacity-80",
+                  )}
+                >
+                  <span>
+                    <span className="block text-sm font-medium">{PROVIDER_LABELS[entry.provider]}</span>
+                    <span className="text-muted-foreground block text-xs">
+                      {entry.username
+                        ? `@${entry.username}`
+                        : !entry.configured
+                          ? "Add the app in Setup"
+                          : entry.needsReauth
+                            ? "Reconnect this account"
+                            : "Connect this network"}
+                    </span>
+                  </span>
+                  <span
+                    className={cn(
+                      "size-5 rounded-full border",
+                      checked ? "border-primary bg-primary" : "border-border",
+                    )}
                   />
-                  <div className="min-w-0 flex-1">
-                    <Label
-                      htmlFor={`dest-${entry.provider}`}
-                      className={cn("text-sm", disabled && "text-muted-foreground")}
-                    >
-                      {PROVIDER_LABELS[entry.provider]}
-                      {entry.username ? (
-                        <span className="text-muted-foreground font-normal">
-                          {" "}
-                          @{entry.username}
-                        </span>
-                      ) : null}
-                    </Label>
-                    {!entry.configured ? (
-                      <p className="text-muted-foreground text-[11px]">
-                        Not configured -{" "}
-                        <Link href="/settings/setup" className="underline underline-offset-2">
-                          setup
-                        </Link>
-                      </p>
-                    ) : !entry.connected ? (
-                      <p className="text-muted-foreground text-[11px]">
-                        Not connected -{" "}
-                        <Link
-                          href="/settings/connections"
-                          className="underline underline-offset-2"
-                        >
-                          connect
-                        </Link>
-                      </p>
-                    ) : entry.needsReauth ? (
-                      <p className="text-[11px] text-amber-400">Needs reconnecting</p>
-                    ) : null}
-                  </div>
-                </div>
+                </button>
               );
             })}
           </CardContent>
@@ -619,16 +699,23 @@ export function Composer({ providers, initialMedia, publicBaseUrlSet }: Props) {
           </Card>
         ) : null}
 
-        <Card>
+        <div className="flex justify-end">
+          <Button type="button" variant="outline" className="h-12 px-8" onClick={() => glide("schedule-stage")}>
+            Continue to schedule
+          </Button>
+        </div>
+
+        <Card id="schedule-stage">
           <CardHeader>
-            <CardTitle className="text-base">When</CardTitle>
+            <CardTitle className="text-xs font-semibold tracking-[0.16em] uppercase">Schedule</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid grid-cols-2 gap-2">
               <Button
                 type="button"
-                variant={mode === "now" ? "default" : "outline"}
+                variant="outline"
                 size="sm"
+                className={mode === "now" ? "border-primary text-primary" : undefined}
                 onClick={() => setMode("now")}
               >
                 <Send className="size-3.5" />
@@ -636,8 +723,9 @@ export function Composer({ providers, initialMedia, publicBaseUrlSet }: Props) {
               </Button>
               <Button
                 type="button"
-                variant={mode === "schedule" ? "default" : "outline"}
+                variant="outline"
                 size="sm"
+                className={mode === "schedule" ? "border-primary text-primary" : undefined}
                 onClick={() => setMode("schedule")}
               >
                 <CalendarClock className="size-3.5" />
@@ -677,7 +765,7 @@ export function Composer({ providers, initialMedia, publicBaseUrlSet }: Props) {
             ) : null}
 
             <Button
-              className="w-full"
+              className="h-12 w-full text-base"
               disabled={busy || problems.length > 0}
               onClick={submit}
             >
@@ -688,6 +776,26 @@ export function Composer({ providers, initialMedia, publicBaseUrlSet }: Props) {
           </CardContent>
         </Card>
 
+        <div id="queue-stage" className="space-y-3">
+          <h2 className="text-xs font-semibold tracking-[0.16em] uppercase">Queue</h2>
+          {buffer.length === 0 ? (
+            <p className="text-muted-foreground text-sm">
+              Nothing is waiting. A post you send now still stops here first, then the worker takes it.
+            </p>
+          ) : (
+            <ul className="divide-border divide-y border">
+              {buffer.map((item) => (
+                <li key={item.id} className="flex flex-wrap items-baseline justify-between gap-3 px-4 py-3">
+                  <span className="min-w-0 truncate text-sm">{item.caption}</span>
+                  <span className="text-muted-foreground text-xs">
+                    {item.destinations.join(", ")} · {item.when}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
         {selectedMedia.length > 0 ? (
           <Card>
             <CardHeader>
@@ -696,14 +804,34 @@ export function Composer({ providers, initialMedia, publicBaseUrlSet }: Props) {
             <CardContent className="space-y-2">
               {selectedMedia.map((asset, index) => (
                 <div key={asset.id} className="flex items-center gap-2">
-                  <MediaThumb media={asset} className="size-8 shrink-0 rounded" />
+                  <MediaThumb media={asset} fit="contain" className="bg-muted h-10 w-14 shrink-0" />
                   <span className="min-w-0 flex-1 truncate text-xs">
                     {index + 1}. {asset.originalName}
                   </span>
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="size-6"
+                    className="size-7"
+                    disabled={index === 0}
+                    onClick={() => moveSelected(asset.id, -1)}
+                    aria-label={`Move ${asset.originalName} earlier`}
+                  >
+                    <ChevronUp className="size-3" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-7"
+                    disabled={index === selectedMedia.length - 1}
+                    onClick={() => moveSelected(asset.id, 1)}
+                    aria-label={`Move ${asset.originalName} later`}
+                  >
+                    <ChevronDown className="size-3" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-7"
                     onClick={() => toggleMedia(asset)}
                     aria-label={`Remove ${asset.originalName}`}
                   >

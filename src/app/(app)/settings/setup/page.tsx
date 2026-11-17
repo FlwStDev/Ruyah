@@ -3,6 +3,7 @@ import { getSetupChecks, env } from "@/lib/env";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { PageBanner } from "@/components/page-banner";
 
 export const dynamic = "force-dynamic";
 
@@ -17,13 +18,10 @@ export default function SetupPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Developer setup</h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          What PostForge can see in your <code className="text-xs">.env</code>. Values are never
-          displayed. Restart the dev server after editing it.
-        </p>
-      </div>
+      <PageBanner
+        title="Setup"
+        lede="What Ruyah can see in your .env. Values are never displayed. Restart after you edit it."
+      />
 
       {blocking.length > 0 ? (
         <Card className="border-destructive/50">

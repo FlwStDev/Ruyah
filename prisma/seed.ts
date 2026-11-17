@@ -24,7 +24,7 @@ async function main() {
   await prisma.user.create({
     data: {
       email,
-      name: "PostForge Admin",
+      name: "Ruyah Admin",
       passwordHash: await bcrypt.hash(password, 12),
       role: "admin",
     },

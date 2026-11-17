@@ -129,9 +129,11 @@ export function MediaUploader({
 export function MediaThumb({
   media,
   className,
+  fit = "cover",
 }: {
   media: SerializedMedia;
   className?: string;
+  fit?: "cover" | "contain";
 }) {
   if (media.kind === "video") {
     return (
@@ -148,7 +150,13 @@ export function MediaThumb({
   // Plain <img>: these are local API routes, so next/image optimization would
   // add a round trip for no benefit.
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={media.url} alt={media.originalName} className={cn("object-cover", className)} />;
+  return (
+    <img
+      src={media.url}
+      alt={media.originalName}
+      className={cn(fit === "contain" ? "object-contain" : "object-cover", className)}
+    />
+  );
 }
 
 export function MediaLibrary({ initialMedia }: { initialMedia: SerializedMedia[] }) {
@@ -177,26 +185,34 @@ export function MediaLibrary({ initialMedia }: { initialMedia: SerializedMedia[]
           Nothing uploaded yet.
         </p>
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+        <div className="border-border overflow-hidden border">
+          <div className="text-muted-foreground grid grid-cols-[88px_1fr_auto_auto] items-center gap-4 border-b px-4 py-2 text-[11px] tracking-[0.14em] uppercase">
+            <span>Preview</span>
+            <span>Name</span>
+            <span>Size</span>
+            <span className="sr-only">Delete</span>
+          </div>
           {media.map((asset) => (
             <div
               key={asset.id}
-              className="group border-border/60 bg-card relative overflow-hidden rounded-lg border"
+              className="hover:bg-muted/40 grid grid-cols-[88px_1fr_auto_auto] items-center gap-4 border-b px-4 py-3 last:border-b-0"
             >
-              <MediaThumb media={asset} className="aspect-square w-full" />
-              <div className="space-y-0.5 p-2">
-                <p className="truncate text-[11px] font-medium" title={asset.originalName}>
+              <div className="bg-muted flex h-14 w-20 items-center justify-center">
+                <MediaThumb media={asset} fit="contain" className="max-h-14 max-w-20" />
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-sm" title={asset.originalName}>
                   {asset.originalName}
                 </p>
-                <p className="text-muted-foreground text-[10px]">
-                  {formatBytes(asset.size)}
-                  {asset.width ? ` - ${asset.width}x${asset.height}` : ""}
+                <p className="text-muted-foreground text-[11px]">
+                  {asset.kind}
+                  {asset.width ? ` · ${asset.width}×${asset.height}` : ""}
                 </p>
               </div>
+              <p className="text-muted-foreground text-xs">{formatBytes(asset.size)}</p>
               <Button
                 size="icon"
-                variant="secondary"
-                className="absolute top-1.5 right-1.5 size-6 opacity-0 transition-opacity group-hover:opacity-100"
+                variant="outline"
                 disabled={deletingId === asset.id}
                 onClick={() => remove(asset)}
                 aria-label={`Delete ${asset.originalName}`}

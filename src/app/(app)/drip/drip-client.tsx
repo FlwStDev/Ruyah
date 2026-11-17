@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageBanner } from "@/components/page-banner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PROVIDER_LABELS, DRIP_INTERVAL_PRESETS, type SocialProvider } from "@/lib/constants";
@@ -132,14 +133,10 @@ export function DripClient({ drips, connected }: Props) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Folder drip</h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Point at a folder of images or mp4s. Every interval the worker posts the oldest unused
-          file, then moves it to <code className="text-xs">_posted</code> so it cannot go out twice.
-          Keep <code className="text-xs">pnpm worker</code> running.
-        </p>
-      </div>
+      <PageBanner
+        title="Storage"
+        lede="Point at a folder on this computer. The oldest unused file goes out on a cadence, then moves aside so it cannot post twice."
+      />
 
       <Card>
         <CardHeader>

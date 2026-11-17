@@ -1,19 +1,24 @@
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
+import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 
+const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
+
 export const metadata: Metadata = {
-  title: "PostForge",
-  description: "Local-first publishing to X, Reddit and Instagram.",
+  title: "Ruyah",
+  description: "Write once. Send it from this computer to the networks you already use.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    // Dark-only UI: no theme toggle to build or persist.
-    <html lang="en" className="dark">
+    <html lang="en" suppressHydrationWarning className={inter.variable}>
       <body className="min-h-screen bg-background text-foreground antialiased">
-        {children}
-        <Toaster position="top-right" richColors closeButton />
+        <ThemeProvider>
+          {children}
+          <Toaster position="top-center" closeButton />
+        </ThemeProvider>
       </body>
     </html>
   );
